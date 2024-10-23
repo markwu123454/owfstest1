@@ -152,7 +152,7 @@ def get_local_ip():
 # Start the WebSocket server
 async def main():
     ip_address = get_local_ip()  # Retrieve the IP address
-    port = 5000  # Define the port
+    port = 6857  # Define the port
 
     logging.info(f"Server listening on 0.0.0.0:{port}")
     logging.info(f"Server at {ip_address}:{port}")
