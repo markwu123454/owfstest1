@@ -1,4 +1,2 @@
-uvicorn
-fastapi
-cryptography
-requests
+websockets
+asyncio
