@@ -12,10 +12,11 @@
   },
   "install": {
     "commands": [
-      "pip install websockets asyncio"
+      "pip install -r requirements.txt"
     ]
   },
   "start": {
-    "command": "python api/c2.py"
+    "command": "python3 c2.py"
   }
 }
+
