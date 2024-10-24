@@ -1,2 +1,3 @@
 websockets
 asyncio
+python-json-logger
