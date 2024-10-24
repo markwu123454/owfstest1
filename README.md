@@ -1,8 +1,6 @@
-# README
+# C2 test
 
-## Description
-
-This script is an asynchronous server application that uses Python's `asyncio` and `websockets` libraries to facilitate communication between a controller and multiple connected clients (infected laptops). The key features include registering clients, relaying messages between controllers and infected clients, maintaining a list of connected clients, and cleaning up old messages.
+This script is an asynchronous server application that uses Python's `asyncio` and `websockets` libraries to facilitate communication between a controller and multiple connected clients (infected laptops). The key features include registering clients, relaying messages between controllers and infected clients, maintaining a list of connected clients, and cleaning up old messages. This is to test how a C2 network would operate for educational / hobbyist purposes.
 
 ### Key Features
 
