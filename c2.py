@@ -152,12 +152,22 @@ async def connection_handler(websocket, path):
 
         await register_client(websocket, role, client_id, data)
         await relay_messages(websocket, client_id, role)
-    except websockets.ConnectionClosed:
-        logger.info("Connection closed for client.", extra={"client_id": client_id if client_id else 'unknown'})
+
+    except websockets.ConnectionClosed as e:
+        logger.info(f"Connection closed for client {client_id}. Reason: {e.reason}. Code: {e.code}")
         if client_id in clients:
             clients[client_id]['disconnected_at'] = datetime.now()
+
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON decoding failed for client {client_id}. Error: {str(e)}")
+        if client_id in clients:
+            clients[client_id]['disconnected_at'] = datetime.now()
+
     except Exception as e:
-        logger.error("Exception occurred in connection handler.", exc_info=True)
+        logger.error("Exception occurred in connection handler.", exc_info=True, extra={"client_id": client_id})
+        if client_id in clients:
+            clients[client_id]['disconnected_at'] = datetime.now()
+
 
 # Function to get the local IP address of the server
 def get_local_ip():
