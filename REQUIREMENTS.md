@@ -1,4 +1,4 @@
-> Last update to REQUIREMENTS.md : Oct 24, 2024
+> Last update to `REQUIREMENTS.md` : Oct 24, 2024
 # Requirements
 
 This project requires Python 3.8 or higher and the following dependencies:
