@@ -1,9 +1,11 @@
 > Last update to `REQUIREMENTS.md` : Oct 24, 2024
 # Requirements
 
-This project requires Python 3.8 or higher and the following dependencies:
+**Python 3.8+**: Ensure Python 3.8 or higher is installed.
 
 ## Installing Dependencies
+
+### Installation
 
 To install all dependencies, use the provided `requirements.txt` file:
 
