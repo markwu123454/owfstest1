@@ -1,4 +1,4 @@
-> Last update: 10/24/2024
+> Last update to README: 10/24/2024
 # C2 Server Project
 
 This Command and Control (C2) server manages communication between a controller and multiple clients using WebSockets. The server allows controllers to issue commands to clients and receive responses in real-time. This project is for educational purposes only.
