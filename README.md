@@ -15,25 +15,4 @@ This Command and Control (C2) server manages communication between a controller 
 - **JSON-based logging**: Logs all connections, commands, and responses in a structured JSON format for easier debugging and tracking.
 
 ## Requirements
-- **Python 3.8+**: Ensure Python 3.8 or higher is installed.
-- Install dependencies with:
-  ```sh
-  pip install -r requirements.txt
-  ```
-
-### Alternate Steps to Install Dependencies
-If installing dependencies via `requirements.txt` does not work, you can manually install the required libraries:
-  ```sh
-  pip install asyncio websockets uuid jsonlogger
-  ```
-  Additional standard libraries such as `uuid`, `json`, `logging`, `socket`, and `datetime` are included with Python by default.
-
-### Libraries
-- **asyncio**: Used for handling asynchronous I/O operations.
-- **websockets**: Implements the WebSocket protocol for real-time communication.
-- **uuid**: Generates unique IDs for clients.
-- **json**: Handles JSON encoding and decoding for message transmission.
-- **logging**: Manages server-side logging of activities.
-- **socket**: Provides network interface functions to determine local IP.
-- **datetime**: Used for handling timestamps and message retention.
-
+You can find all requirements and installation steps, along with an alternative if the main installation steps don't work, on `REQUIREMENTS.md`.
