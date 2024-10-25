@@ -16,3 +16,12 @@ This Command and Control (C2) server manages communication between a controller 
 
 ## Requirements
 You can find all requirements and installation steps, along with an alternative if the main installation steps don't work, on `REQUIREMENTS.md`.
+
+### Disclaimer
+- **This project is provided for educational purposes only. The use of this server and any associated code is at your own risk. By using this repository, you acknowledge that:
+
+- **Security & Privacy:** This server is not guaranteed to be secure. You should not use it to handle sensitive data or in production environments without proper security audits and implementations.
+
+- **Legal Use:** It is your responsibility to ensure that your use of this server and any of its components complies with applicable laws and regulations in your country. The repository's creator(s) are not responsible for any misuse or illegal activity arising from the use of this code.
+
+- **Support & Maintenance:** This code is provided "as is" without any guarantee of support or future updates. If you encounter issues, feel free to open an issue or contribute to the project, but there are no obligations for further development.
