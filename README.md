@@ -34,10 +34,9 @@ The script requires the following Python libraries:
 2. Run the script:
 
    ```sh
-   python script_name.py
+   python c2.py
    ```
 
-   Replace `script_name.py` with the actual name of the script file.
 
 ### Configuration
 
