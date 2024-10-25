@@ -1,3 +1,4 @@
+> Last update: 10/24/2024
 # C2 Server Project
 
 This Command and Control (C2) server manages communication between a controller and multiple clients using WebSockets. The server allows controllers to issue commands to clients and receive responses in real-time. This project is for educational purposes only.
@@ -19,6 +20,13 @@ This Command and Control (C2) server manages communication between a controller 
   ```sh
   pip install -r requirements.txt
   ```
+
+### Alternate Steps to Install Dependencies
+If installing dependencies via `requirements.txt` does not work, you can manually install the required libraries:
+  ```sh
+  pip install asyncio websockets uuid jsonlogger
+  ```
+  Additional standard libraries such as `uuid`, `json`, `logging`, `socket`, and `datetime` are included with Python by default.
 
 ### Libraries
 - **asyncio**: Used for handling asynchronous I/O operations.
