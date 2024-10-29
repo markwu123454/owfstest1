@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from pythonjsonlogger import jsonlogger
 import os
 
+
 # Configure logging
 log_handler = logging.StreamHandler()
 formatter = jsonlogger.JsonFormatter()
